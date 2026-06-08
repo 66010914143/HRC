@@ -49,13 +49,16 @@
 
             <div class="col-span-1">
                 <label class="block text-sm font-semibold text-gray-400 mb-2">{{ __('messages.user_id_login') }}</label>
-                <input type="text" value="{{ $user->username }}" 
+                <input type="text" name="username" value="{{ $user->username }}" 
                        class="w-full px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 cursor-not-allowed outline-none" readonly>
             </div>
 
             <div class="col-span-1">
-                <label class="block text-sm font-semibold text-gray-700 mb-2">{{ __('messages.new_password_label') }} <span class="text-xs font-normal text-gray-400">({{ __('messages.leave_blank_if_no_change') }})</span></label>
-                <input type="password" name="password" 
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    {{ __('messages.new_password_label') }} 
+                    <span class="text-xs font-normal text-gray-400">({{ __('messages.leave_blank_if_no_change') }})</span>
+                </label>
+                <input type="password" name="password" id="password" 
                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
             </div>
 
@@ -133,7 +136,7 @@
 </div>
 
 <script>
-    // ดึงค่าคำแปลแปลมาเก็บไว้ในตัวแปร JavaScript เพื่อใช้สลับภาษาใน Dropdown ตอนเกิด Real-time
+    // ดึงค่าคำแปลมาเก็บไว้ในตัวแปร JavaScript เพื่อใช้สลับภาษาใน Dropdown
     const txtSelectPosition = "{{ __('messages.select_position') }}";
     const txtSelectBranch = "{{ __('messages.select_branch') }}";
     const txtSelectDepartment = "{{ __('messages.select_department') }}";
@@ -184,11 +187,15 @@
     // ดึงค่าตำแหน่งปัจจุบันของ User จากฐานข้อมูลหรือ Old value ของ Form
     let currentPosition = "{{ old('position', $user->position) }}";
 
+    // ฟังก์ชันตรวจสอบว่า Dropdown กำลังถูกคลิกใช้งานอยู่หรือไม่ ป้องกันการรีเฟรชขณะใช้งาน
+    const isFocused = (id) => document.activeElement === document.getElementById(id);
+
     // ฟังก์ชันกรองตำแหน่งงานแยกตามระดับอย่างเด็ดขาดและแม่นยำ
     function updatePositions(level, selectedPos = null) {
-        // ใช้ค่าตำแหน่งที่ส่งเข้ามา ถ้าไม่มีให้ใช้ค่าที่เลือกอยู่ ณ ปัจจุบันใน select
+        if (isFocused('position')) return; // ป้องกันการเปลี่ยนค่าตัวเลือกขณะ User กำลังคลิกเลือก
+
         const activeSelect = selectedPos || positionSelect.value;
-        positionSelect.innerHTML = `<option value="">${txtSelectPosition}</option>`;
+        let optionsHTML = `<option value="">${txtSelectPosition}</option>`;
         
         let targets = [];
         
@@ -217,7 +224,7 @@
                 } else if (levelFullText.includes('ทดลองงาน') || levelFullText.includes('ระดับ 6') || (level == '6')) {
                     targets = allPositions.filter(p => p.includes('ทดลองงาน') || p.includes('ฝึกงาน'));
                 } else {
-                    // หากไม่ตรงเงื่อนไขคำใดๆ เลย หรือ job_level_id ใน DB เป็น NULL ให้ fallback นำเอาตำแหน่งทั้งหมดมาแสดงแทน ป้องกันหน้าจอว่างเปล่า
+                    // หากไม่ตรงเงื่อนไขคำใดๆ เลย ให้ดึงข้อมูลทั้งหมดมาแสดงป้องกันหน้าจอว่างเปล่า
                     targets = allPositions;
                 }
             }
@@ -226,63 +233,71 @@
         // ลบชื่อซ้ำออก
         const uniqueTargets = [...new Set(targets)];
 
-        // แสดงรายชื่อลง Dropdown UI
+        // ประกอบ String HTML เพื่อลดปัญหาภาพกระตุก
         uniqueTargets.forEach(function(pos) {
-            const option = document.createElement('option');
-            option.value = pos;
-            option.text = pos;
-            
-            if (pos === activeSelect || pos === currentPosition) {
-                option.selected = true;
-            }
-            positionSelect.appendChild(option);
+            const isSelected = (pos === activeSelect || pos === currentPosition) ? 'selected' : '';
+            optionsHTML += `<option value="${pos}" ${isSelected}>${pos}</option>`;
         });
+
+        // อัปเดตเมื่อมีข้อมูลเปลี่ยนแปลงเท่านั้น
+        if(positionSelect.innerHTML !== optionsHTML) {
+            positionSelect.innerHTML = optionsHTML;
+        }
     }
 
     // ฟังก์ชันดึงข้อมูลแบบ Real-time จาก API หลังบ้าน
     async function fetchDropdownsRealtime() {
         try {
             // ดึงข้อมูลสาขา
-            const resBranch = await fetch('/admin/api/branches');
-            if (resBranch.ok) {
-                const branches = await resBranch.json();
-                const selectBranch = document.getElementById('branch');
-                const currentVal = selectBranch.value;
-                selectBranch.innerHTML = `<option value="">${txtSelectBranch}</option>`;
-                branches.forEach(b => {
-                    const name = b.name || b.branch_name;
-                    if(name) selectBranch.innerHTML += `<option value="${name}" ${currentVal === name ? 'selected' : ''}>${name}</option>`;
-                });
+            if (!isFocused('branch')) {
+                const resBranch = await fetch('/admin/api/branches');
+                if (resBranch.ok) {
+                    const branches = await resBranch.json();
+                    const selectBranch = document.getElementById('branch');
+                    const currentVal = selectBranch.value;
+                    let branchHTML = `<option value="">${txtSelectBranch}</option>`;
+                    branches.forEach(b => {
+                        const name = b.name || b.branch_name;
+                        if(name) branchHTML += `<option value="${name}" ${currentVal === name ? 'selected' : ''}>${name}</option>`;
+                    });
+                    if(selectBranch.innerHTML !== branchHTML) selectBranch.innerHTML = branchHTML;
+                }
             }
 
             // ดึงข้อมูลฝ่าย
-            const resDept = await fetch('/admin/api/departments');
-            if (resDept.ok) {
-                const depts = await resDept.json();
-                const selectDept = document.getElementById('department');
-                const currentVal = selectDept.value;
-                selectDept.innerHTML = `<option value="">${txtSelectDepartment}</option>`;
-                depts.forEach(d => {
-                    const name = d.name || d.department_name;
-                    if(name) selectDept.innerHTML += `<option value="${name}" ${currentVal === name ? 'selected' : ''}>${name}</option>`;
-                });
+            if (!isFocused('department')) {
+                const resDept = await fetch('/admin/api/departments');
+                if (resDept.ok) {
+                    const depts = await resDept.json();
+                    const selectDept = document.getElementById('department');
+                    const currentVal = selectDept.value;
+                    let deptHTML = `<option value="">${txtSelectDepartment}</option>`;
+                    depts.forEach(d => {
+                        const name = d.name || d.department_name;
+                        if(name) deptHTML += `<option value="${name}" ${currentVal === name ? 'selected' : ''}>${name}</option>`;
+                    });
+                    if(selectDept.innerHTML !== deptHTML) selectDept.innerHTML = deptHTML;
+                }
             }
 
             // ดึงข้อมูลระดับสายงาน
-            const resLevel = await fetch('/admin/api/job-levels');
-            if (resLevel.ok) {
-                const levels = await resLevel.json();
-                const selectLevel = document.getElementById('position_level');
-                const currentVal = selectLevel.value;
-                selectLevel.innerHTML = `<option value="">${txtSelectLevel}</option>`;
-                levels.forEach(l => {
-                    const id = l.id;
-                    const name = l.name || l.level_name;
-                    if(id) {
-                        selectLevel.innerHTML += `<option value="${id}" ${currentVal == id ? 'selected' : ''}>${name}</option>`;
-                        levelNamesMapping[id] = name;
-                    }
-                });
+            if (!isFocused('position_level')) {
+                const resLevel = await fetch('/admin/api/job-levels');
+                if (resLevel.ok) {
+                    const levels = await resLevel.json();
+                    const selectLevel = document.getElementById('position_level');
+                    const currentVal = selectLevel.value;
+                    let levelHTML = `<option value="">${txtSelectLevel}</option>`;
+                    levels.forEach(l => {
+                        const id = l.id;
+                        const name = l.name || l.level_name;
+                        if(id) {
+                            levelHTML += `<option value="${id}" ${currentVal == id ? 'selected' : ''}>${name}</option>`;
+                            levelNamesMapping[id] = name;
+                        }
+                    });
+                    if(selectLevel.innerHTML !== levelHTML) selectLevel.innerHTML = levelHTML;
+                }
             }
 
             // ดึงข้อมูลตำแหน่งงานเพื่อทำกรองข้อมูลแบบจับคู่
@@ -304,7 +319,7 @@
                     }
                 });
 
-                // ตรวจสอบว่ามีตำแหน่งงานที่เลือกไว้หรือไม่ ถ้ามีให้ใช้รักษาสถานะเดิมไว้หลังดึงข้อมูล Real-time
+                // ตรวจสอบว่ามีตำแหน่งงานที่เลือกไว้หรือไม่
                 const activePos = positionSelect.value || currentPosition;
                 updatePositions(levelSelect.value, activePos);
             }
@@ -328,7 +343,6 @@
 
     // เรียกดึงข้อมูล Real-time อัตโนมัติเมื่อหน้าจอโฟกัส
     window.addEventListener('focus', function() {
-        // รักษาตำแหน่งก่อนโฟกัสเอาไว้
         const activePos = positionSelect.value || currentPosition;
         fetchDropdownsRealtime().then(() => {
             if (activePos) {

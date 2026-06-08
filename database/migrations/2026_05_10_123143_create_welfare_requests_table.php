@@ -28,7 +28,7 @@ return new class extends Migration
                 
                 // 2. ระบบสถานะและการอนุมัติ
                 $table->enum('status', ['pending', 'approved', 'rejected'])->default('pending');
-                $table->unsignedBigInteger('approver_id')->nullable()->after('status'); // เพิ่มเติม: เก็บ ID ของหัวหน้าที่มีสิทธิ์อนุมัติตามสายงาน (NULL = อนุมัติทันที)
+                $table->unsignedBigInteger('approver_id')->nullable(); // แก้ไข: นำ ->after('status') ออกเนื่องจากห้ามใช้ในการสร้างตารางใหม่ (Create)
                 $table->integer('approved_by')->nullable(); // เก็บ ID ของหัววันที่อนุมัติ
                 $table->timestamp('approved_at')->nullable(); // วันที่เวลาที่กดอนุมัติ
                 

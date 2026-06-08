@@ -436,4 +436,25 @@ class UserController extends Controller
                 return null;
         }
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | 🟢 ฟังก์ชันสำหรับรองรับ AJAX ในการดึงข้อมูล Job Titles โดยระบุเงื่อนไข ID
+    |--------------------------------------------------------------------------
+    |
+    */
+    public function getJobTitlesByDepartment($id)
+    {
+        // ทำการค้นหาตำแหน่งงานตาม id ของกลุ่มระดับงาน/ฝ่ายที่เกี่ยวข้อง
+        $jobTitles = JobTitle::where('job_level_id', $id)
+                             ->orderBy('name', 'asc')
+                             ->get();
+
+        // หากไม่พบข้อมูลตามเงื่อนไข ให้ดึงข้อมูลทั้งหมดสำรองไว้เพื่อไม่ให้ Dropdown ว่างเปล่า
+        if ($jobTitles->isEmpty()) {
+            $jobTitles = JobTitle::orderBy('name', 'asc')->get();
+        }
+
+        return response()->json($jobTitles);
+    }
 }

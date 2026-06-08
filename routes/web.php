@@ -218,6 +218,9 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/admin/manage-update/{type}/{id}', [UserController::class, 'updateManageItem']);
     Route::delete('/admin/manage-delete/{type}/{id}', [UserController::class, 'deleteManageItem']);
 
+    // --- 🟢 สร้างใหม่: Route สำหรับรองรับ JavaScript/AJAX ในการดึงข้อมูลตำแหน่งงาน (Job Titles) ตาม ID ---
+    Route::get('/get-job-titles/{id}', [UserController::class, 'getJobTitlesByDepartment']);
+
 });
 
 // ==========================================================================

@@ -109,7 +109,7 @@
                         <select id="position" name="position" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" required>
                             <option value="">-- {{ __('messages.select_position') }} --</option>
                             @foreach($jobTitles as $title)
-                                <option value="{{ $title->name }}" data-id="{{ $title->id }}" data-level="{{ $title->job_level_id }}" class="hidden" {{ old('position') == $title->name ? 'selected' : '' }}>{{ $title->name }}</option>
+                                <option value="{{ $title->name }}" data-id="{{ $title->id }}" data-level="{{ $title->job_level_id }}" class="hidden" {{ old('position') == $title->name ? 'selected' : '' }}>{{ $title->name }}{{ (isset($title->position_type) && $title->position_type === 'head') ? ' 🔴' : '' }}</option>
                             @endforeach
                         </select>
                         <button type="button" onclick="openModal('job-title')" class="px-2.5 py-2 bg-blue-800 text-white font-bold rounded-lg hover:bg-blue-900 transition shadow" title="{{ __('messages.add_job_title') }}">+</button>
@@ -211,7 +211,7 @@
 
         const dbJobTitles = [
             @foreach($jobTitles as $title)
-                { id: "{{ $title->id }}", name: "{{ $title->name }}", job_level_id: "{{ $title->job_level_id }}" },
+                { id: "{{ $title->id }}", name: "{{ $title->name }}", job_level_id: "{{ $title->job_level_id }}", position_type: "{{ $title->position_type ?? '' }}" },
             @endforeach
         ];
 
@@ -225,7 +225,7 @@
                 const uniqueTitles = [...new Set(dbJobTitles.map(t => t.name))];
                 uniqueTitles.forEach(name => {
                     const matched = dbJobTitles.find(t => t.name === name);
-                    appendOption(matched.name, matched.id, matched.job_level_id);
+                    appendOption(matched.name, matched.id, matched.job_level_id, matched.position_type);
                 });
                 return;
             }
@@ -235,7 +235,7 @@
             const targetJobLevelId = activeLevelOption ? activeLevelOption.getAttribute('data-id') : null;
 
             const filteredTitles = dbJobTitles.filter(title => {
-                if ((targetJobLevelId && String(title.job_level_id) === String(targetJobLevelId)) || String(title.job_level_id) === String(selectedLevel)) {
+                if (targetJobLevelId && String(title.job_level_id) === String(targetJobLevelId)) {
                     return true;
                 }
 
@@ -275,7 +275,7 @@
             });
 
             finalUniqueTitles.forEach(function(title) {
-                appendOption(title.name, title.id, title.job_level_id);
+                appendOption(title.name, title.id, title.job_level_id, title.position_type);
             });
 
             if (selectCustomValue) {
@@ -283,10 +283,10 @@
             }
         }
 
-        function appendOption(name, id, jobLevelId) {
+        function appendOption(name, id, jobLevelId, positionType) {
             const option = document.createElement('option');
             option.value = name;
-            option.text = name;
+            option.text = positionType === 'head' ? name + ' 🔴' : name;
             option.setAttribute('data-id', id || 'default');
             option.setAttribute('data-level', jobLevelId || '');
             positionSelect.appendChild(option);
@@ -385,7 +385,7 @@
                         updatePositionDropdown(res.data.level_number);
                     } 
                     else if (currentType === 'job-title') {
-                        dbJobTitles.push({ id: res.data.id || '', name: res.data.name, job_level_id: res.data.job_level_id || activeFormJobLevelId });
+                        dbJobTitles.push({ id: res.data.id || '', name: res.data.name, job_level_id: res.data.job_level_id || activeFormJobLevelId, position_type: res.data.position_type || positionTypeValue });
                         updatePositionDropdown(activeFormLevel, res.data.name);
                     } 
                     else {
