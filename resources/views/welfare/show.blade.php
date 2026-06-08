@@ -4,7 +4,7 @@
 {{-- ส่วนที่แสดงบนหน้าจอปกติ --}}
 <div class="container py-3 d-print-none">
     <div class="d-flex justify-content-between">
-        <a href="{{ route('welfare.index') }}" class="btn btn-sm btn-outline-secondary">{{ __('messages.welfare_back_home') }}</a>
+        <a href="{{ route('welfare.history') }}" class="btn btn-sm btn-outline-secondary">{{ __('messages.welfare_back_home') }}</a>
         <button onclick="window.print()" class="btn btn-sm btn-dark">{{ __('messages.welfare_print_pdf') }}</button>
     </div>
 </div>
@@ -64,21 +64,40 @@
     <div class="signature-section mt-5 pt-4">
         <div class="row text-center">
             <div class="col-6 offset-3">
+                
+                {{-- ส่วนลายเซ็นผู้ขอเบิก --}}
                 <div class="signature-box mb-5">
+                    <div style="height: 40px; display: flex; align-items: end; justify-content: center; margin-bottom: 5px;">
+                        @if($welfareRequest->user && $welfareRequest->user->signature)
+                            <img src="{{ asset('storage/' . $welfareRequest->user->signature) }}" style="max-height: 40px; object-fit: contain;">
+                        @else
+                            ลงชื่อ.........................................
+                        @endif
+                    </div>
                     <p class="mb-0 fw-bold">({{ $welfareRequest->user->name }})</p>
-                    <p class="small">{{ __('messages.welfare_requester_sign') }}</p>
+                    <p class="small mb-0">{{ __('messages.welfare_requester_sign') }}</p>
                     <p class="small mt-1">{{ __('messages.welfare_sign_date') }}</p>
                 </div>
+                
+                {{-- ส่วนลายเซ็นผู้อนุมัติ --}}
                 <div class="signature-box mt-5">
-                    <p class="mb-0">(................................................)</p>
-                    <p class="small fw-bold">{{ __('messages.welfare_approver_sign') }}</p>
+                    <div style="height: 40px; display: flex; align-items: end; justify-content: center; margin-bottom: 5px;">
+                        @if(isset($welfareRequest->approver) && $welfareRequest->approver->signature)
+                            <img src="{{ asset('storage/' . $welfareRequest->approver->signature) }}" style="max-height: 40px; object-fit: contain;">
+                        @else
+                            ลงชื่อ.........................................
+                        @endif
+                    </div>
+                    <p class="mb-0 fw-bold">( {{ isset($welfareRequest->approver) ? $welfareRequest->approver->name : '................................................' }} )</p>
+                    <p class="small fw-bold mb-0">{{ __('messages.welfare_approver_sign') }}</p>
                     <p class="small mt-1">{{ __('messages.welfare_sign_date') }}</p>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <div class="print-footer d-none d-print-block">
+    <div class="print-footer d-none d-print-block mt-4">
         <small>{{ __('messages.welfare_printed_by', ['date' => date('d/m/Y H:i')]) }}</small>
     </div>
 </div>

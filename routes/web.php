@@ -9,6 +9,7 @@ use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\WelfareRequestController;
 use App\Http\Controllers\RoomBookingController;
 use App\Http\Controllers\CompanyCalendarController;
+use App\Http\Controllers\InternalMemoController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
@@ -89,8 +90,12 @@ Route::middleware(['auth'])->group(function () {
         return view('profile.edit', compact('myPosts')); 
     })->name('profile.edit');
 
-    Route::post('/profile/image', [ProfileController::class, 'updateImage'])->name('profile.image.update');
-    
+    // เพิ่มใหม่สำหรับรองรับการอัปโหลดรูปภาพโปรไฟล์ผ่าน AJAX/Form เพื่อแก้ปัญหา Route Not Found Exception
+    Route::post('/profile/image/update', [ProfileController::class, 'updateImage'])->name('profile.image.update');
+
+    // เพิ่มใหม่สำหรับรองรับการอัปโหลดลายเซ็นผ่าน AJAX เพื่อแก้ปัญหา Route [profile.signature.update] not defined.
+    Route::post('/profile/signature/update', [ProfileController::class, 'updateSignature'])->name('profile.signature.update');
+
     // --- ระบบคอมเมนต์ ---
     Route::post('/comments/{post_id}', [\App\Http\Controllers\CommentController::class, 'store'])->name('comments.store');
     Route::delete('/comments/{id}', function($id) {
@@ -119,9 +124,13 @@ Route::middleware(['auth'])->group(function () {
     // --- ระบบลาออนไลน์ (Leave System) ---
     Route::get('/leave/approvals', [LeaveRequestController::class, 'approvals'])->name('leave.approvals');
     Route::get('/leave', [LeaveRequestController::class, 'index'])->name('leave.index');
+    Route::get('/leave/create', [LeaveRequestController::class, 'create'])->name('leave.create');
     Route::post('/leave', [LeaveRequestController::class, 'store'])->name('leave.store');
     Route::patch('/leave/{id}/approve', [LeaveRequestController::class, 'approve'])->name('leave.approve');
     Route::patch('/leave/{id}/reject', [LeaveRequestController::class, 'reject'])->name('leave.reject');
+    
+    // เพิ่มใหม่: Route สำหรับพิมพ์ใบลา (PDF) หน้าแยก (ปรับปรุงโครงสร้าง URL แก้ไขปัญหา 404)
+    Route::get('/leave/print/{id}', [LeaveRequestController::class, 'print'])->name('leave.print');
 
     // --- ระบบเบิกสวัสดิการ (Welfare System) ---
     Route::get('/welfare/history', [WelfareRequestController::class, 'history'])->name('welfare.history'); 
@@ -152,6 +161,20 @@ Route::middleware(['auth'])->group(function () {
     // --- ระบบปฏิทินองค์กร (Company Calendar System) ---
     Route::get('/company-calendar', [CompanyCalendarController::class, 'index'])->name('company_calendar.index');
     Route::post('/company-calendar/store', [CompanyCalendarController::class, 'store'])->name('company_calendar.store');
+
+    // --- ระบบเอกสารบันทึกภายใน (Internal Memo System) ---
+    Route::prefix('internal-memo')->name('internal_memo.')->group(function () {
+        Route::get('/', [InternalMemoController::class, 'index'])->name('index');
+        Route::get('/create', [InternalMemoController::class, 'create'])->name('create');
+        Route::post('/store', [InternalMemoController::class, 'store'])->name('store');
+        
+        // เพิ่มสเปซสำหรับหน้าตรวจสอบและจัดการรายการคำขออนุมัติของหัวหน้า/CEO
+        Route::get('/approvals', [InternalMemoController::class, 'approvals'])->name('approvals');
+        Route::post('/approvals/{id}/action', [InternalMemoController::class, 'approveAction'])->name('approve_action');
+
+        Route::post('/{id}/approve', [InternalMemoController::class, 'approve'])->name('approve');
+        Route::post('/{id}/reject', [InternalMemoController::class, 'reject'])->name('reject');
+    });
 
     // --- ส่วนของ Admin (การจัดการสมาชิก) ---
     Route::get('/admin/add-user', [UserController::class, 'create'])->name('admin.users.create');

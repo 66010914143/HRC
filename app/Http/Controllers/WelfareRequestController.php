@@ -137,7 +137,7 @@ class WelfareRequestController extends Controller
             return view('welfare.history', compact('highLevelRequests', 'generalRequests', 'welfareRequests', 'isAdminView', 'search'));
 
         } else {
-            // สำหรับพนักงานธรรมดา ดูประวัติเฉพาะของตนเอง
+            // สำหรับพนักงานธรรมดา และ หัวหน้าแผนก ดูประวัติเฉพาะของตนเอง
             $welfareRequests = WelfareRequest::where('user_id', $user->id)
                 ->orderBy('created_at', 'desc')
                 ->get();
@@ -158,7 +158,7 @@ class WelfareRequestController extends Controller
     {
         $user = Auth::user();
         // แก้ไข: เพิ่ม 'ผู้จัดการกลุ่มงาน' เข้าไป
-        $approverPositions = ['ประธานเจ้าหน้าที่บริหาร', 'ประธานสายงาน', 'ผู้อำนวยการอาวุโสกลุ่มงาน', 'ผู้จัดการอาวุโสกลุ่มงาน', 'ผู้จัดการกลุ่มงาน', 'ผู้จัดการฝ่าย', 'ผู้ชำนาญการ'];
+        $approverPositions = ['ประธานเจ้าหน้าที่บริหาร', 'ประธานสายงาน', 'ผู้อำนวยการอาวุโสกลุ่มงาน', 'ผู้จัดการอาวิโสกลุ่มงาน', 'ผู้จัดการกลุ่มงาน', 'ผู้จัดการฝ่าย', 'ผู้ชำนาญการ'];
 
         // ตรวจสอบผ่านระบบสิทธิ์ใหม่
         $jobTitle = JobTitle::where('name', trim($user->position))->first();
@@ -179,9 +179,27 @@ class WelfareRequestController extends Controller
         return view('welfare.approvals', compact('pendingRequests'));
     }
 
+    /**
+     * ปรับปรุง: ดึงรายชื่อหัวหน้า/ผู้อนุมัติ เพื่อนำไปแสดงผลในฟอร์มลงทะเบียนเบิกสวัสดิการ
+     */
     public function create()
     {
-        return view('welfare.create');
+        $user = Auth::user();
+
+        // ค้นหาพนักงานคนอื่นๆ ทั้งหมดที่มีตำแหน่งเป็นกลุ่มผู้อนุมัติหลัก หรือถูกกำหนดบทบาทโครงสร้างเป็น 'head'
+        $approverPositions = ['ประธานเจ้าหน้าที่บริหาร', 'ประธานสายงาน', 'ผู้อำนวยการอาวุโสกลุ่มงาน', 'ผู้จัดการอาวุโสกลุ่มงาน', 'ผู้จัดการกลุ่มงาน', 'ผู้จัดการฝ่าย', 'ผู้ชำนาญการ'];
+        
+        $approvers = User::where('id', '!=', $user->id)
+            ->where(function($query) use ($approverPositions) {
+                $query->whereIn('position', $approverPositions)
+                      ->orWhereIn('position', function($subQuery) {
+                          $subQuery->select('name')->from('job_titles')->where('position_type', 'head');
+                      });
+            })
+            ->orderBy('name', 'asc')
+            ->get();
+
+        return view('welfare.create', compact('approvers'));
     }
 
     public function show($id)
@@ -203,35 +221,33 @@ class WelfareRequestController extends Controller
         return view('welfare.show', compact('welfareRequest'));
     }
 
+    /**
+     * ปรับปรุง: รองรับการรับค่าและบันทึกรหัสของหัวหน้าแผนก/ผู้อนุมัติ (approver_id) จากฟอร์มหน้าเว็บบอร์ด
+     */
     public function store(Request $request)
     {
         $request->validate([
             'title' => 'required|string|max:255',
             'type' => 'required|string',
             'amount' => 'required|numeric|min:1',
+            'approver_id' => 'nullable|exists:users,id', // ตรวจสอบความถูกต้องของผู้อนุมัติที่ถูกเลือก
             'attachment' => 'nullable|file|mimes:jpeg,png,jpg,pdf|max:2048',
         ]);
 
         $user = Auth::user();
         $status = 'pending';
-        $approverId = null;
         
-        // --- 🚀 เริ่มตรวจสอบเงื่อนไขสายการอนุมัติตามประเภทสิทธิ์ใหม่ (พนักงาน / หัวหน้าแผนก) ---
+        // ตรวจสอบเงื่อนไขสายการอนุมัติตามประเภทสิทธิ์
         $jobTitle = JobTitle::where('name', trim($user->position))->first();
         $positionType = $jobTitle ? $jobTitle->position_type : 'employee';
 
         if ($positionType === 'head') {
             // กรณีเป็นหัวหน้าแผนก: อนุมัติผ่านอัตโนมัติทันที
             $status = 'approved';
+            $approverId = null;
         } else {
-            // กรณีเป็นพนักงานทั่วไป: สืบค้นหาผู้ใช้ในแผนกและสาขาเดียวกัน ที่ถูกตั้งประเภทตำแหน่งเป็น "head"
-            $approver = User::where('department', $user->department)
-                            ->where('branch', $user->branch)
-                            ->where('id', '!=', $user->id)
-                            ->whereIn('position', function($query) {
-                                $query->select('name')->from('job_titles')->where('position_type', 'head');
-                            })->first();
-            $approverId = $approver ? $approver->id : null;
+            // กรณีเป็นพนักงานทั่วไป: บันทึกด้วยรหัสผู้อนุมัติที่ผู้ใช้งานกดเลือกมาจากหน้าฟอร์ม
+            $approverId = $request->approver_id;
         }
 
         $attachmentPath = null;
@@ -247,7 +263,7 @@ class WelfareRequestController extends Controller
             'description' => $request->description,
             'attachment' => $attachmentPath,
             'status' => $status,
-            'approver_id' => $approverId, // บันทึก ID เป้าหมายของหัวหน้าที่จะเป็นผู้มีสิทธิ์ตรวจใบนี้
+            'approver_id' => $approverId, // บันทึกข้อมูล ID ของหัวหน้าที่ผู้ใช้ระบุเลือกโดยตรง
             'approved_by' => ($status == 'approved') ? $user->id : null,
             'approved_at' => ($status == 'approved') ? now() : null,
         ]);
@@ -266,12 +282,14 @@ class WelfareRequestController extends Controller
         $jobTitle = JobTitle::where('name', trim(Auth::user()->position))->first();
         $isHead = $jobTitle && $jobTitle->position_type === 'head';
 
-        if (!$isHead && !in_array(Auth::user()->position, $approverPositions)) {
+        // 🟢 อนุญาตให้ Admin หรือผู้มีสิทธิ์ กดอนุมัติได้
+        if (!$isHead && !in_array(Auth::user()->position, $approverPositions) && Auth::user()->role !== 'admin') {
             return redirect()->back()->with('error', 'คุณไม่มีสิทธิ์ในการอนุมัติ');
         }
 
         $welfare->update([
             'status' => 'approved',
+            'approver_id' => Auth::user()->id, // 🟢 บันทึก ID ของคนที่กดอนุมัติจริง
             'approved_by' => Auth::user()->id,
             'approved_at' => now(),
         ]);
@@ -297,7 +315,8 @@ class WelfareRequestController extends Controller
         $jobTitle = JobTitle::where('name', trim(Auth::user()->position))->first();
         $isHead = $jobTitle && $jobTitle->position_type === 'head';
 
-        if (!$isHead && !in_array(Auth::user()->position, $approverPositions)) {
+        // 🟢 อนุญาตให้ Admin หรือผู้มีสิทธิ์ กดปฏิเสธได้
+        if (!$isHead && !in_array(Auth::user()->position, $approverPositions) && Auth::user()->role !== 'admin') {
             return redirect()->back()->with('error', 'คุณไม่มีสิทธิ์ในการดำเนินการนี้');
         }
 
@@ -305,6 +324,7 @@ class WelfareRequestController extends Controller
         $welfare->update([
             'status' => 'rejected',
             'remark' => $request->admin_remark, 
+            'approver_id' => Auth::user()->id, // 🟢 บันทึก ID ของคนที่กดปฏิเสธจริง
             'approved_by' => Auth::user()->id,
             'approved_at' => now(),
         ]);

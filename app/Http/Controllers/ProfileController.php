@@ -52,4 +52,49 @@ class ProfileController extends Controller
             'message' => 'ไม่พบไฟล์ที่ส่งมา'
         ]);
     }
+
+    // เพิ่มฟังก์ชันใหม่สำหรับการอัปโหลดลายเซ็นอิเล็กทรอนิกส์
+    public function updateSignature(Request $request)
+    {
+        // 1. ตรวจสอบไฟล์ (อนุญาตเฉพาะไฟล์รูปภาพ)
+        $request->validate([
+            'signature' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+        ]);
+
+        $user = Auth::user();
+
+        if ($request->hasFile('signature')) {
+            try {
+                // 2. ลบรูปเก่า (ถ้ามี)
+                if ($user->signature) {
+                    Storage::disk('public')->delete($user->signature);
+                }
+
+                // 3. เก็บไฟล์ใหม่ไปที่โฟลเดอร์ signatures
+                $path = $request->file('signature')->store('signatures', 'public');
+                
+                // 4. บันทึกลง Database
+                $user->update([
+                    'signature' => $path
+                ]);
+
+                return response()->json([
+                    'success' => true, 
+                    'message' => 'อัปโหลดลายเซ็นสำเร็จ',
+                    'path' => asset('storage/' . $path)
+                ]);
+
+            } catch (\Exception $e) {
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()
+                ]);
+            }
+        }
+
+        return response()->json([
+            'success' => false, 
+            'message' => 'ไม่พบไฟล์ที่ส่งมา'
+        ]);
+    }
 }

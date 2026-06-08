@@ -108,6 +108,17 @@
                                 <label class="form-label fw-bold small">{{ __('messages.end_date') }}</label>
                                 <input type="date" name="end_date" class="form-control rounded-3 shadow-sm" required>
                             </div>
+                            
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-primary"><i class="fas fa-user-shield me-1"></i>ส่งคำขอการลาถึง (หัวหน้าแผนก)</label>
+                                <select name="approver_id" class="form-select rounded-3 shadow-sm border-primary text-dark" required>
+                                    <option value="">-- เลือกหัวหน้าแผนกผู้อนุมัติ --</option>
+                                    @foreach($managers as $manager)
+                                        <option value="{{ $manager->id }}">{{ $manager->name }} {{ $manager->last_name }} ({{ $manager->position ?? 'หัวหน้าแผนก' }})</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-12">
                                 <label class="form-label fw-bold small">{{ __('messages.leave_reason_label') }}</label>
                                 <textarea name="reason" rows="2" class="form-control rounded-3 shadow-sm" placeholder="{{ __('messages.leave_reason_placeholder') }}" required></textarea>
@@ -124,23 +135,15 @@
             {{-- ส่วนที่ 3: ศูนย์จัดการประวัติ (Admin Search & Tabs) --}}
             @if(auth()->user()->role == 'admin')
                 <div class="card shadow-sm border-0 rounded-4 p-4 mb-4 bg-white">
-                    <form action="{{ url()->current() }}" method="GET" class="row g-3 align-items-center">
-                        <div class="col-12 col-md-6 col-lg-5">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-12">
                             <label class="form-label small fw-bold text-secondary"><i class="fas fa-search me-1"></i>{{ __('messages.search_staff_name') }}</label>
                             <div class="input-group border rounded-3 overflow-hidden shadow-sm">
                                 <span class="input-group-text bg-white border-0 text-muted"><i class="fas fa-user"></i></span>
-                                <input type="text" name="search" class="form-control border-0 shadow-none ps-2 py-2" placeholder="{{ __('messages.search_placeholder') }}" value="{{ request('search') }}">
+                                <input type="text" id="liveSearchInput" name="search" class="form-control border-0 shadow-none ps-2 py-2" placeholder="{{ __('messages.search_placeholder') }}" value="">
                             </div>
                         </div>
-                        <div class="col-12 col-md-3 d-flex align-items-end pt-md-4">
-                            <button type="submit" class="btn btn-primary w-100 rounded-3 py-2 shadow-sm fw-bold">{{ __('messages.btn_search') }}</button>
-                        </div>
-                        @if(request('search'))
-                        <div class="col-12 col-md-2 d-flex align-items-end pt-md-4">
-                            <a href="{{ url()->current() }}" class="btn btn-light w-100 border text-muted rounded-3 py-2 fw-bold">{{ __('messages.btn_clear') }}</a>
-                        </div>
-                        @endif
-                    </form>
+                    </div>
                 </div>
 
                 <div class="card shadow-sm border-0 rounded-4 overflow-hidden bg-white">
@@ -165,7 +168,7 @@
                         {{-- แท็บพนักงานระดับสูง --}}
                         <div class="tab-pane fade show active" id="high-pane">
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
+                                <table class="table table-hover align-middle mb-0" id="highLevelTable">
                                     <thead class="bg-light">
                                         <tr class="text-muted fs-7 fw-bold">
                                             <th class="ps-4 py-3">{{ __('messages.th_requester') }}</th>
@@ -177,9 +180,9 @@
                                     </thead>
                                     <tbody>
                                         @forelse($highLevelLeaves as $leave)
-                                            <tr>
+                                            <tr class="searchable-row">
                                                 <td class="ps-4">
-                                                    <div class="fw-bold text-dark">{{ $leave->user->name }} {{ $leave->user->last_name }}</div>
+                                                    <div class="fw-bold text-dark employee-name">{{ $leave->user->name }} {{ $leave->user->last_name }}</div>
                                                     <div class="text-muted extra-small">{{ $leave->user->position }}</div>
                                                 </td>
                                                 <td>
@@ -202,7 +205,7 @@
                                                 </td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="5" class="text-center py-5 text-muted">{{ __('messages.no_data_high_level') }}</td></tr>
+                                            <tr class="no-data-row"><td colspan="5" class="text-center py-5 text-muted">{{ __('messages.no_data_high_level') }}</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
@@ -212,7 +215,7 @@
                         {{-- แท็บพนักงานทั่วไป --}}
                         <div class="tab-pane fade" id="general-pane">
                             <div class="table-responsive">
-                                <table class="table table-hover align-middle mb-0">
+                                <table class="table table-hover align-middle mb-0" id="generalLevelTable">
                                     <thead class="bg-light">
                                         <tr class="text-muted fs-7 fw-bold">
                                             <th class="ps-4 py-3">{{ __('messages.th_requester') }}</th>
@@ -224,9 +227,9 @@
                                     </thead>
                                     <tbody>
                                         @forelse($generalLeaves as $leave)
-                                            <tr>
+                                            <tr class="searchable-row">
                                                 <td class="ps-4">
-                                                    <div class="fw-bold text-dark">{{ $leave->user->name }} {{ $leave->user->last_name }}</div>
+                                                    <div class="fw-bold text-dark employee-name">{{ $leave->user->name }} {{ $leave->user->last_name }}</div>
                                                     <div class="text-muted extra-small">{{ $leave->user->position }}</div>
                                                 </td>
                                                 <td>
@@ -245,11 +248,14 @@
                                                     <div class="text-muted extra-small mt-1 italic">{{ $leave->approver ? $leave->approver->name : 'System' }}</div>
                                                 </td>
                                                 <td class="text-center pe-4">
-                                                    <button type="button" onclick="viewMyLeaveDetail({{ json_encode($leave) }}, {{ json_encode($leave->approver) }}, {{ json_encode($leave->user) }})" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-eye me-1"></i>{{ __('messages.btn_view_leave') }}</button>
+                                                    <div class="d-flex justify-content-center gap-2">
+                                                        <button type="button" onclick="viewMyLeaveDetail({{ json_encode($leave) }}, {{ json_encode($leave->approver) }}, {{ json_encode($leave->user) }})" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-eye me-1"></i>{{ __('messages.btn_view_leave') }}</button>
+                                                        <button type="button" onclick="printMyLeave({{ json_encode($leave) }})" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-print me-1"></i>{{ __('messages.btn_print_pdf') }}</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="5" class="text-center py-5 text-muted">{{ __('messages.no_data_general_level') }}</td></tr>
+                                            <tr class="no-data-row"><td colspan="5" class="text-center py-5 text-muted">{{ __('messages.no_data_general_level') }}</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
@@ -258,6 +264,7 @@
                     </div>
                 </div>
             @else
+            
                 {{-- ประวัติการลาของฉัน (สำหรับ User) --}}
                 <div class="card shadow-sm border-0 rounded-4 overflow-hidden bg-white">
                     <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
@@ -293,7 +300,10 @@
                                     </td>
                                     <td class="text-muted extra-small italic">{{ $leave->approver ? $leave->approver->name : ($leave->status == 'auto_approved' ? __('messages.status_auto_approved') : '-') }}</td>
                                     <td class="text-center pe-4">
-                                        <button type="button" onclick="viewMyLeaveDetail({{ json_encode($leave) }}, {{ json_encode($leave->approver) }}, {{ json_encode(auth()->user()) }})" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-eye me-1"></i>{{ __('messages.btn_detail') }}</button>
+                                        <div class="d-flex justify-content-center gap-2">
+                                            <button type="button" onclick="viewMyLeaveDetail({{ json_encode($leave) }}, {{ json_encode($leave->approver) }}, {{ json_encode(auth()->user()) }})" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-eye me-1"></i>{{ __('messages.btn_detail') }}</button>
+                                            <button type="button" onclick="printMyLeave({{ json_encode($leave) }})" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm"><i class="fas fa-print me-1"></i>{{ __('messages.btn_print_pdf') }}</button>
+                                        </div>
                                     </td>
                                 </tr>
                                 @empty
@@ -309,7 +319,7 @@
     </div>
 </div>
 
-{{-- Modal ส่องรายละเอียดใบลา (ใช้ Modal เดิมของคุณแต่ปรับสีให้เข้ากับ UI ใหม่) --}}
+{{-- Modal ส่องรายละเอียดใบลา --}}
 <div id="myLeaveModal" class="modal fade" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-md modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg rounded-4">
@@ -349,26 +359,8 @@
                 </div>
             </div>
             <div class="modal-footer border-0 p-4 pt-0">
-                <button type="button" onclick="window.print()" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm"><i class="fas fa-print me-2"></i>{{ __('messages.btn_print_pdf') }}</button>
+                <button type="button" onclick="closeMyLeaveModal()" class="btn btn-secondary w-100 rounded-pill fw-bold shadow-sm">ปิดหน้าต่าง</button>
             </div>
-        </div>
-    </div>
-</div>
-
-{{-- ส่วน Print PDF ลับ (ซ่อนไว้แสดงเมื่อสั่ง Print) --}}
-<div id="printArea" class="print-only hidden">
-    <div style="padding: 50px; text-align: center;">
-        <h2 style="border-bottom: 2px solid black; padding-bottom: 20px;">{{ __('messages.print_title') }}</h2>
-        <div style="text-align: right; margin: 20px 0;">{{ __('messages.print_write_date') }} <span id="mCreateDate" class="underline-dot"></span></div>
-        <div style="text-align: left; line-height: 2.5; margin-top: 30px;">
-            {{ __('messages.print_dear') }}<br>
-            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ข้าพเจ้า <span id="mUser" class="underline-dot"></span> ตำแหน่ง <span id="mPosition" class="underline-dot"></span> แผนก <span id="mDepartment" class="underline-dot"></span><br>
-            มีความประสงค์ขอ <span id="mType" class="underline-dot" style="font-weight:bold;"></span> เนื่องจาก <span id="mReason" class="underline-dot"></span><br>
-            ตั้งแต่วันที่ <span id="mStartDate" class="underline-dot"></span> ถึงวันที่ <span id="mEndDate" class="underline-dot"></span> รวมเป็นเวลา <span id="mTotalDays" class="underline-dot"></span> วัน
-        </div>
-        <div style="margin-top: 100px; display: flex; justify-content: space-between;">
-            <div style="text-align: center;">ลงชื่อ.........................................<br>( <span id="mSignUser"></span> )<br>{{ __('messages.print_sign_user') }}</div>
-            <div style="text-align: center;">ลงชื่อ.........................................<br>( <span id="mSignApprover"></span> )<br>{{ __('messages.print_sign_approver') }}</div>
         </div>
     </div>
 </div>
@@ -382,15 +374,67 @@
     .nav-tabs .nav-link { border: none; background: transparent; padding: 1rem 1.25rem; border-bottom: 3px solid transparent; color: #6c757d; }
     .nav-tabs .nav-link.active { border: none; background: transparent; border-bottom: 3px solid #0d6efd; color: #0d6efd !important; }
     .extra-small { font-size: 0.75rem; }
-    .underline-dot { border-bottom: 1px dotted black; padding: 0 10px; }
-    @media print {
-        body * { visibility: hidden; }
-        #printArea, #printArea * { visibility: visible; }
-        #printArea { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-    }
+    .hidden { display: none !important; }
 </style>
 
 <script>
+    // ระบบ Live Search ตรวจจับตอนพิมพ์เพื่อกรองข้อมูลทันที
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('liveSearchInput');
+        if (searchInput) {
+            // ฟังก์ชันหลักที่ทำงานเมื่อมีการพิมพ์ค้นหา
+            function runSearchFilter() {
+                const filterText = searchInput.value.trim().toLowerCase();
+                filterTableRows('highLevelTable', filterText);
+                filterTableRows('generalLevelTable', filterText);
+            }
+
+            // เรียกทำงานทันทีตอนโหลดหน้าเสร็จ เพื่อป้องกันปัญหารายการหายจากค่าว่างที่ติดมาจาก URL
+            runSearchFilter();
+
+            // ตรวจจับเมื่อผู้ใช้กำลังพิมพ์ในช่องค้นหา
+            searchInput.addEventListener('input', runSearchFilter);
+        }
+    });
+
+    function filterTableRows(tableId, filterText) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const rows = table.querySelectorAll('.searchable-row');
+        let hasVisibleRow = false;
+
+        rows.forEach(row => {
+            const nameEl = row.querySelector('.employee-name');
+            if (nameEl) {
+                const textValue = nameEl.textContent || nameEl.innerText;
+                // หากคำค้นหาเป็นค่าว่าง หรือมีคำที่ตรงกับชื่อพนักงาน ให้แสดงผลแถวนั้นๆ
+                if (filterText === "" || textValue.toLowerCase().indexOf(filterText) > -1) {
+                    row.style.display = "";
+                    hasVisibleRow = true;
+                } else {
+                    row.style.display = "none";
+                }
+            }
+        });
+
+        // จัดการกรณีค้นหาแล้วไม่เจอข้อมูลเลยในตารางนั้นๆ
+        let noDataRow = table.querySelector('.no-data-row');
+        if (!hasVisibleRow && rows.length > 0) {
+            if (!noDataRow) {
+                const tbody = table.querySelector('tbody');
+                noDataRow = document.createElement('tr');
+                noDataRow.className = 'no-data-row';
+                noDataRow.innerHTML = `<td colspan="5" class="text-center py-5 text-muted">ไม่พบข้อมูลพนักงานที่ค้นหา</td>`;
+                tbody.appendChild(noDataRow);
+            } else {
+                noDataRow.style.display = "";
+            }
+        } else if (noDataRow) {
+            noDataRow.style.display = "none";
+        }
+    }
+
     function viewMyLeaveDetail(leave, approver, user) {
         const fullName = `${user.name} ${user.last_name || ''}`;
         document.getElementById('popUser').innerText = fullName;
@@ -417,7 +461,6 @@
         const diffDays = Math.ceil(Math.abs(end - start) / (1000 * 60 * 60 * 24)) + 1;
 
         document.getElementById('popLeavePeriod').innerText = `${startStr} - ${endStr}`;
-        // ใช้การส่งค่าตัวแปรในแปลภาษาสำหรับข้อความจำนวนวัน
         let daysTemplate = "{{ __('messages.modal_days_count', ['count' => ':dayCount']) }}";
         document.getElementById('popLeaveDays').innerText = daysTemplate.replace(':dayCount', diffDays);
 
@@ -428,21 +471,13 @@
             evidenceBlock.innerHTML = `<span class="text-muted extra-small italic">{{ __('messages.no_evidence_img') }}</span>`;
         }
 
-        // เตรียมข้อมูลสำหรับ Print
-        document.getElementById('mUser').innerText = fullName;
-        document.getElementById('mSignUser').innerText = fullName;
-        document.getElementById('mPosition').innerText = user.position || '-';
-        document.getElementById('mDepartment').innerText = user.department || '-';
-        document.getElementById('mType').innerText = leave.leave_type;
-        document.getElementById('mReason').innerText = leave.reason || '-';
-        document.getElementById('mStartDate').innerText = startStr;
-        document.getElementById('mEndDate').innerText = endStr;
-        document.getElementById('mTotalDays').innerText = diffDays;
-        document.getElementById('mCreateDate').innerText = new Date().toLocaleDateString('th-TH');
-        document.getElementById('mSignApprover').innerText = approver ? approver.name : '.......................................';
-
         var myModal = new bootstrap.Modal(document.getElementById('myLeaveModal'));
         myModal.show();
+    }
+
+    function printMyLeave(leave) {
+        let printUrl = "{{ url('leave/print') }}/" + leave.id;
+        window.open(printUrl, '_blank');
     }
 
     function closeMyLeaveModal() {

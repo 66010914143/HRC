@@ -29,6 +29,7 @@ class User extends Authenticatable
         'role',               // สถานะระบบ (admin/user)
         'profile_image',
         'last_leave_view_at', // บันทึกเวลาเข้าดูเพื่อเคลียร์ Notification
+        'signature',          // ลายเซ็นอิเล็กทรอนิกส์ (เพิ่มใหม่)
     ];
 
     /**

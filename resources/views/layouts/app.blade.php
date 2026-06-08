@@ -141,10 +141,60 @@
                 </div>
             </div>
 
-            <a href="#" class="nav-item flex items-center py-3 px-4 rounded-lg text-slate-300 {{ Request::is('documents*') ? 'active text-white' : '' }}">
-                <i class="fas fa-file-alt nav-icon mr-3"></i>
-                <span class="font-medium">{{ __('messages.document_folder') }}</span>
-            </a>
+            {{-- เมนูบันทึกภายใน (Internal Memo) ปรับปรุงเป็น Dropdown --}}
+            @php
+                $memoNotificationCount = 0;
+                if(Auth::check()) {
+                    $memoNotificationCount = \App\Models\InternalMemo::where(function($query) {
+                        $query->where('approver_1_id', Auth::id())->where('approver_1_status', 'pending');
+                    })->orWhere(function($query) {
+                        $query->where('approver_2_id', Auth::id())->where('approver_2_status', 'pending')
+                              ->where(function($sub) {
+                                  $sub->where('approver_1_status', 'approved')->orWhereNull('approver_1_id');
+                              });
+                    })->count();
+                }
+            @endphp
+            <div x-data="{ open: {{ Request::is('internal-memo*') ? 'true' : 'false' }} }" class="space-y-1">
+                <button @click="open = !open" 
+                    class="nav-item w-full flex items-center justify-between py-3 px-4 rounded-lg text-slate-300 border-0 bg-transparent outline-none {{ Request::is('internal-memo*') ? 'bg-slate-800/50' : '' }}">
+                    <div class="flex items-center">
+                        <i class="fas fa-file-alt nav-icon mr-3"></i>
+                        <span class="font-medium">บันทึกภายใน (Memo)</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        @if($memoNotificationCount > 0)
+                            <span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full ring-4 ring-slate-900">
+                                {{ $memoNotificationCount }}
+                            </span>
+                        @endif
+                        <i class="fas fa-chevron-down text-xs transition-transform duration-300" :class="open ? 'rotate-180' : ''"></i>
+                    </div>
+                </button>
+
+                <div x-show="open" x-cloak x-transition class="ml-9 space-y-1 border-l-2 border-slate-800 pl-4 py-1">
+                    <a href="{{ route('internal_memo.index') }}" class="block py-2 text-sm {{ Request::routeIs('internal_memo.index') ? 'text-blue-400 font-bold' : 'hover:text-white' }} transition-colors">
+                        ยื่นขอและประวัติบันทึกภายใน
+                    </a>
+
+                    @php
+                        $memoApproverPositions = [
+                            'ประธานเจ้าหน้าที่บริหาร',
+                            'ประธานผู้บริหารสายงาน',
+                            'ประธานสายงาน',
+                            'ผู้อำนวยการอาวุโสกลุ่มงาน',
+                            'ผู้จัดการกลุ่มงาน',
+                            'ผู้จัดการฝ่าย',
+                            'ผู้ชำนาญการ'
+                        ];
+                    @endphp
+                    @if(Auth::check() && in_array(Auth::user()->position, $memoApproverPositions) && Auth::user()->role !== 'admin')
+                        <a href="{{ route('internal_memo.approvals') }}" class="block py-2 text-sm {{ Request::routeIs('internal_memo.approvals') ? 'text-orange-400 font-bold' : 'hover:text-white text-orange-500/70' }} transition-colors">
+                            อนุมัติใบบันทึกภายใน
+                        </a>
+                    @endif
+                </div>
+            </div>
 
             {{-- คำนวณแจ้งเตือนเบิกสวัสดิการ --}}
             @php

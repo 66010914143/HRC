@@ -68,6 +68,33 @@
 
         <div class="mt-12 pt-8 border-t border-gray-100">
             <h3 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
+                <span class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3 text-sm">✍️</span>
+                ลายเซ็นอิเล็กทรอนิกส์ (E-Signature)
+            </h3>
+            <div class="flex flex-col md:flex-row gap-6 items-center bg-gray-50 p-6 rounded-xl border border-gray-200">
+                <div class="w-full md:w-1/2 flex flex-col items-center justify-center">
+                    <div id="signature_display" class="w-full max-w-sm h-32 bg-white border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden shadow-sm relative">
+                        @if(Auth::user()->signature)
+                            <img src="{{ asset('storage/' . Auth::user()->signature) }}" class="max-w-full max-h-full object-contain p-2">
+                        @else
+                            <span class="text-gray-400 text-sm">ยังไม่มีการตั้งค่าลายเซ็น</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="w-full md:w-1/2 flex flex-col items-center md:items-start space-y-4">
+                    <p class="text-sm text-gray-500 text-center md:text-left">อัปโหลดภาพลายเซ็นของคุณเพื่อใช้ในเอกสารใบลาและสวัสดิการอัตโนมัติ<br>(แนะนำไฟล์ .png ที่ไม่มีพื้นหลัง หรือพื้นหลังสีขาว)</p>
+                    <label for="signature_upload" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-6 rounded-lg cursor-pointer transition shadow-sm flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        อัปโหลดลายเซ็นใหม่
+                    </label>
+                    <input type="file" id="signature_upload" class="hidden" accept="image/png, image/jpeg, image/jpg">
+                    <span id="signature_upload_status" class="text-sm font-medium text-blue-600 hidden">กำลังอัปโหลด...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-12 pt-8 border-t border-gray-100">
+            <h3 class="text-xl font-bold text-slate-800 mb-6 flex items-center">
                 <span class="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center mr-3 text-sm">📝</span>
                 {{ trans('messages.profile_history_title') }}
             </h3>
@@ -109,6 +136,7 @@
 
 @push('scripts')
 <script>
+    // สคริปต์อัปโหลดรูปโปรไฟล์ (เดิม)
     document.getElementById('profile_upload').addEventListener('change', function() {
         const file = this.files[0];
         if (!file) return;
@@ -127,7 +155,40 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) window.location.reload();
-            else alert('{{ trans("messages.profile_error") }}' + data.message);
+            else alert('{{ trans("messages.profile_error") }}' + (data.message || ''));
+        });
+    });
+
+    // สคริปต์อัปโหลดลายเซ็น (ใหม่)
+    document.getElementById('signature_upload').addEventListener('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('signature', file);
+        formData.append('_token', '{{ csrf_token() }}');
+
+        const statusText = document.getElementById('signature_upload_status');
+        statusText.classList.remove('hidden');
+        statusText.textContent = 'กำลังอัปโหลด...';
+
+        // ** ต้องสร้าง Route ชื่อ profile.signature.update ในไฟล์ web.php **
+        fetch('{{ route("profile.signature.update") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert('เกิดข้อผิดพลาด: ' + (data.message || 'ไม่สามารถอัปโหลดลายเซ็นได้'));
+                statusText.classList.add('hidden');
+            }
+        })
+        .catch(error => {
+            alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+            statusText.classList.add('hidden');
         });
     });
 </script>

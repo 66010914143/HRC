@@ -32,6 +32,17 @@
                 <input type="number" name="amount" step="0.01" class="w-full border rounded-lg p-2" placeholder="0.00" required>
             </div>
 
+            {{-- หัวหน้าแผนก / ผู้อนุมัติ (ส่วนที่เพิ่มใหม่) --}}
+            <div class="md:col-span-2">
+                <label class="block text-gray-700 mb-2">หัวหน้าแผนก / ผู้อนุมัติ</label>
+                <select name="approver_id" class="w-full border rounded-lg p-2" required>
+                    <option value="">-- เลือกผู้อนุมัติ --</option>
+                    @foreach($approvers as $approver)
+                        <option value="{{ $approver->id }}">{{ $approver->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             {{-- รายละเอียด --}}
             <div class="md:col-span-2">
                 <label class="block text-gray-700 mb-2">{{ __('messages.welfare_detail_label') }}</label>
