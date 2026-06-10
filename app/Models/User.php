@@ -50,6 +50,15 @@ class User extends Authenticatable
     ];
 
     /**
+     * Relationship: เชื่อมต่อไปยังตาราง JobTitle (Many-to-One)
+     * ลิงก์ฟิลด์ position ของ User ไปที่ name ของตาราง job_titles เพื่อเช็คข้อมูล position_type (head/employee)
+     */
+    public function jobTitle()
+    {
+        return $this->belongsTo(JobTitle::class, 'position', 'name');
+    }
+
+    /**
      * Relationship: หนึ่งคนสามารถส่งใบลาได้หลายครั้ง (One-to-Many)
      */
     public function leaveRequests()

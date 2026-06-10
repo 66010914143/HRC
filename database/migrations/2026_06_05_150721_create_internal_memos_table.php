@@ -34,7 +34,7 @@ return new class extends Migration
             $table->string('target_department')->nullable(); 
             // ---------------------
             
-            // สถานะรวมของเอกสาร (เพิ่ม 'processing' และ 'acknowledged' สำหรับเคส CEO)
+            // Status รวมของเอกสาร (เพิ่ม 'processing' และ 'acknowledged' สำหรับเคส CEO)
             $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'acknowledged'])->default('pending');
             
             // สาเหตุที่ปฏิเสธ (ดักเก็บข้อความเมื่อมีการ Reject)

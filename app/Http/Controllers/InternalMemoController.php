@@ -25,27 +25,27 @@ class InternalMemoController extends Controller
             ->where('id', '!=', $user->id)
             ->get();
 
-        // 2. ดึงรายชื่อประธานเจ้าหน้าที่บริหาร (Level 0) ที่อยู่สาขาเดียวกัน
-        $ceos = User::where('branch', $user->branch)
-            ->where(function($q) {
+        // 2. ปรับปรุง: ดึงรายชื่อประธานเจ้าหน้าที่บริหารจากทุกสาขา เพื่อให้แสดงรายชื่อแน่นอน
+        $ceos = User::where(function($q) {
                 $q->where('position_level', 0)
                   ->orWhere('position_level', '0')
-                  ->orWhere('position', 'LIKE', '%ประธานเจ้าหน้าที่บริหาร%');
+                  ->orWhere('position', 'LIKE', '%ประธานเจ้าหน้าที่บริหาร%')
+                  ->orWhere('position', 'LIKE', '%CEO%');
             })
             ->where('id', '!=', $user->id)
             ->get();
 
-        // 3. ดึงประวัติการขอเอกสารบันทึกภายในของคนล็อกอิน (พนักงานทั่วไปเห็นเฉพาะของตัวเอง, Admin เห็นทุกคน)
+        // 3. ดึงประวัติการขอเอกสารบันทึกภายในของคนล็อกอิน
         if ($user->role === 'admin') {
             $memos = InternalMemo::with(['user', 'approver1', 'approver2'])->orderBy('created_at', 'desc')->paginate(10);
         } else {
             $memos = InternalMemo::with(['approver1', 'approver2'])->where('user_id', $user->id)->orderBy('created_at', 'desc')->paginate(10);
         }
 
-        // 🔥 ผูกตัวแปร $myMemos ให้ชี้ไปยังชุดข้อมูลประวัติเอกสาร ($memos) เพื่อรองรับหน้า View
+        // ผูกตัวแปร $myMemos ให้ชี้ไปยังชุดข้อมูลประวัติเอกสาร เพื่อรองรับหน้า View
         $myMemos = $memos;
 
-        // 4. ดึงรายการที่รอคนล็อกอินเข้ามารออนุมัติ (ทั้งในฐานะผู้อนุมัติคนแรก หรือคนที่สอง)
+        // 4. ดึงรายการที่รอคนล็อกอินเข้ามารออนุมัติ
         $pendingApprovals = InternalMemo::with('user')
             ->where(function($query) use ($user) {
                 // รอหัวหน้าแผนกอนุมัติขั้นแรก
@@ -53,12 +53,12 @@ class InternalMemoController extends Controller
                       ->where('approver_1_status', 'pending');
             })
             ->orWhere(function($query) use ($user) {
-                // รอ CEO อนุมัติขั้นที่สอง (หลังจากหัวหน้าแผนกอนุมัติผ่านแล้ว หรือกรณีหัวหน้าแผนกส่งตรงหา CEO)
+                // รอ CEO อนุมัติขั้นที่สอง
                 $query->where('approver_2_id', $user->id)
                       ->where('approver_2_status', 'pending')
                       ->where(function($sub) {
                           $sub->where('approver_1_status', 'approved')
-                              ->orWhereNull('approver_1_id'); // กรณีหัวหน้าขอเอง จะไม่มีผู้อนุมัติคนที่ 1
+                              ->orWhereNull('approver_1_id');
                       });
             })
             ->orderBy('created_at', 'desc')
@@ -68,34 +68,33 @@ class InternalMemoController extends Controller
     }
 
     /**
-     * แก้ไข: ฟังก์ชันแสดงหน้าสำหรับกรอกใบคำขอบันทึกภายใน (แก้เงื่อนไขเช็ค พนักงานทั่วไป/หัวหน้างาน)
+     * แก้ไข: ฟังก์ชันแสดงหน้าสร้างฟอร์ม (จำแนกสิทธิ์ พนักงานทั่วไป / หัวหน้าแผนก)
      */
     public function create()
     {
-        $user = Auth::user();
+        // โหลดข้อมูลความสัมพันธ์ของตำแหน่งงาน โดยจับคู่ฟิลด์ข้อความตรงๆ
+        $user = Auth::user()->load('jobTitle');
 
-        // ดึงรายชื่อหัวหน้าแผนก/ฝ่าย (ที่อยู่สาขาและแผนกเดียวกัน)
+        // ดึงรายชื่อหัวหน้าแผนก/ฝ่าย
         $departmentHeads = User::where('branch', $user->branch)
             ->where('department', $user->department)
             ->where('id', '!=', $user->id)
             ->get();
 
-        // ดึงรายชื่อประธานเจ้าหน้าที่บริหาร (Level 0)
-        // เอาเงื่อนไขเรื่องแผนกออกเพื่อให้เรียกข้ามสายงานเข้าหา CEO (level 0) ทุกคนได้
+        // 🎯 ปรับปรุง: ดึงรายชื่อประธานเจ้าหน้าที่บริหารจากทุกสาขา เพื่อแก้ปัญหารายชื่อไม่ขึ้น
         $ceos = User::where(function($q) {
                 $q->where('position_level', 0)
                   ->orWhere('position_level', '0')
-                  ->orWhere('position', 'LIKE', '%ประธานเจ้าหน้าที่บริหาร%');
+                  ->orWhere('position', 'LIKE', '%ประธานเจ้าหน้าที่บริหาร%')
+                  ->orWhere('position', 'LIKE', '%CEO%');
             })
             ->where('id', '!=', $user->id)
             ->get();
 
-        // 🔥 ตรวจสอบสิทธิ์ระบบ: ถ้า level เป็น 'general' และในตำแหน่งไม่มีคำว่า LEVEL 3/ผู้จัดการ/หัวหน้า/กลุ่มงาน จะถือว่าเป็นพนักงานทั่วไป
-        $isStaff = ($user->level === 'general' && 
-                    !str_contains($user->position, 'LEVEL 3') && 
-                    !str_contains($user->position, 'ผู้จัดการ') && 
-                    !str_contains($user->position, 'หัวหน้า') &&
-                    !str_contains($user->position, 'กลุ่มงาน'));
+        // 🎯 ตรวจสอบสิทธิ์ CEO / หัวหน้าแผนก
+        $isCeo = ($user->role === 'ceo' || (isset($user->position) && (Str::contains(strtoupper($user->position), 'CEO') || Str::contains($user->position, 'ประธานเจ้าหน้าที่บริหาร'))));
+        $isHead = ($user->jobTitle && $user->jobTitle->position_type === 'head');
+        $isStaff = !$isHead && !$isCeo;
 
         return view('internal_memo.create', compact('user', 'departmentHeads', 'ceos', 'isStaff'));
     }
@@ -105,56 +104,68 @@ class InternalMemoController extends Controller
      */
     public function store(Request $request)
     {
-        $user = Auth::user();
+        // โหลดข้อมูลความสัมพันธ์ของตำแหน่งงาน
+        $user = Auth::user()->load('jobTitle');
 
-        // 🔥 เช็กระดับผู้ใช้งานเพื่อนำมาแยกแยะสิทธิ์ในการคำนวณเงื่อนไข Validation
-        $isStaff = ($user->level === 'general' && 
-                    !str_contains($user->position, 'LEVEL 3') && 
-                    !str_contains($user->position, 'ผู้จัดการ') && 
-                    !str_contains($user->position, 'หัวหน้า') &&
-                    !str_contains($user->position, 'กลุ่มงาน'));
+        // 🎯 เช็คสิทธิ์เด็ดขาด: เป็น CEO หรือไม่ (ตรวจจาก role และ ชื่อตำแหน่งงานตรงๆ)
+        $isCeo = ($user->role === 'ceo' || ($user->jobTitle && $user->jobTitle->position_level == 0) || (isset($user->position) && (Str::contains(strtoupper($user->position), 'CEO') || Str::contains($user->position, 'ประธานเจ้าหน้าที่บริหาร'))));
+        $isHead = ($user->jobTitle && $user->jobTitle->position_type === 'head');
+        $isStaff = !$isHead && !$isCeo;
 
-        // ตั้งค่า Rule แบบไดนามิกตามเงื่อนไขที่ปรับปรุงใหม่
-        if ($isStaff) {
-            // พนักงานทั่วไป: บังคับเลือกหัวหน้าแผนก (approver_1) เสมอ ส่วน CEO (approver_2) บังคับเฉพาะเมื่อเลือกแบบ 2 ขั้นตอน
+        // ตั้งค่ากฎ Validation ตามเงื่อนไขของสิทธิ์ผู้ใช้งาน
+        if ($isCeo || $isHead) {
+            // หากเป็น CEO หรือระดับหัวหน้างาน: บันทึกลงระบบเลย ไม่ต้องตรวจสอบฟิลด์ผู้อนุมัติ
+            $approver1Rule = 'nullable';
+            $approver2Rule = 'nullable';
+            $approvalTypeRule = 'nullable';
+        } elseif ($isStaff) {
+            // พนักงานทั่วไป: เลือกได้ 1 หรือ 2 คน (บังคับหัวหน้าแผนกก่อนเสมอ ส่วน CEO บังคับเฉพาะเมื่อเลือกแบบ 2 ขั้นตอน)
             $approver1Rule = 'required|exists:users,id';
             $approver2Rule = $request->approval_type == '2' ? 'required|exists:users,id' : 'nullable|exists:users,id';
+            $approvalTypeRule = 'required|in:1,2';
         } else {
-            // ระดับหัวหน้างานขึ้นไป: ส่งตรงหา CEO เท่านั้น (approver_1 เป็นโมฆะ/เว้นว่างได้, approver_2 บังคับกรอก)
             $approver1Rule = 'nullable|exists:users,id';
             $approver2Rule = 'required|exists:users,id';
+            $approvalTypeRule = 'required|in:1,2';
         }
 
         // ตรวจสอบความถูกต้องของข้อมูลก่อนบันทึก
         $request->validate([
             'subject' => 'required|string',
             'amount' => 'nullable|numeric|min:0',
-            'approval_type' => 'required|in:1,2',
+            'approval_type' => $approvalTypeRule,
             'approver_1_id' => $approver1Rule,
             'approver_2_id' => $approver2Rule,
-            'files.*' => 'nullable|file|max:10240' // จำกัดขนาดไฟล์ละไม่เกิน 10MB
+            'files.*' => 'nullable|file|max:10240'
         ]);
 
-        // 🚀 ระบบสุ่มเลขที่เอกสารอัตโนมัติและตรวจสอบไม่ให้ซ้ำในระบบ
+        // รันเลขที่เอกสารอัตโนมัติ
         do {
             $memoNumber = 'MEMO-' . date('Ymd') . '-' . strtoupper(Str::random(4));
         } while (InternalMemo::where('memo_number', $memoNumber)->exists());
 
-        $approvalType = $request->approval_type;
-        $approver1Id = $request->approver_1_id;
-        $approver2Id = $request->approver_2_id;
-
-        // จัดการและเคลียร์ค่า ID ตามสิทธิ์ผู้ใช้งานจริงก่อนลง Database
-        if (!$isStaff) { 
-            // หัวหน้างานบังคับวิ่งเข้า CEO โดยตรง (ข้ามผู้อนุมัติคนแรก)
+        // กำหนดค่าเริ่มต้นตามสถานะผู้ใช้
+        if ($isCeo || $isHead) {
+            // ✨ หากเป็น CEO หรือ หัวหน้างาน: อนุมัติอัตโนมัติทันทีเพื่อเก็บประวัติลงระบบ ให้ Admin ตรวจสอบได้หน้าบ้าน โดยไม่ต้องเลือกส่งหาใคร
             $approvalType = 1;
-            $approver1Id = null; 
-            $approver2Id = $request->approver_2_id; 
+            $approver1Id = null;
+            $approver2Id = null;
+            $approver1Status = 'approved';
+            $approver2Status = 'approved';
+            $documentStatus = 'approved';
         } else {
-            // พนักงานทั่วไปแต่เลือกแบบ 1 คน (ส่งหาหัวหน้าแผนกอย่างเดียว) ให้เคลียร์ค่าผู้อนุมัติคนที่สองออก
+            // พนักงานทั่วไป ใช้ Logic ปกติเดิม
+            $approvalType = $request->approval_type;
+            $approver1Id = $request->approver_1_id;
+            $approver2Id = $request->approver_2_id;
+
             if ($approvalType == 1) {
                 $approver2Id = null;
             }
+
+            $approver1Status = $approver1Id ? 'pending' : 'approved';
+            $approver2Status = $approver2Id ? 'pending' : null;
+            $documentStatus = 'pending';
         }
 
         // 1. บันทึกข้อมูลเอกสารหลักลงฐานข้อมูล
@@ -168,13 +179,13 @@ class InternalMemoController extends Controller
             'amount' => $request->amount,
             'approval_type' => $approvalType,
             'approver_1_id' => $approver1Id,
-            'approver_1_status' => $approver1Id ? 'pending' : 'approved', // ถ้าไม่มีผู้อนุมัติคนแรกให้ถือว่า Approved เลยเพื่อข้ามไปหาคนสอง
+            'approver_1_status' => $approver1Status,
             'approver_2_id' => $approver2Id,
-            'approver_2_status' => $approver2Id ? 'pending' : 'pending',
-            'status' => 'pending'
+            'approver_2_status' => $approver2Status,
+            'status' => $documentStatus
         ]);
 
-        // 2. จัดการบันทึกไฟล์แนบอัปโหลด
+        // 2. บันทึกไฟล์แนบอัปโหลด (ถ้ามี)
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 if ($file->isValid()) {
@@ -190,7 +201,11 @@ class InternalMemoController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', 'สร้างเอกสารบันทึกภายในเลขที่ ' . $memoNumber . ' เรียบร้อยแล้ว');
+        $msg = ($isCeo || $isHead)
+            ? 'บันทึกเอกสารบันทึกภายในเลขที่ ' . $memoNumber . ' เรียบร้อยแล้ว (อนุมัติอัตโนมัติเพื่อเก็บประวัติในระบบ)' 
+            : 'สร้างเอกสารบันทึกภายในเลขที่ ' . $memoNumber . ' เรียบร้อยแล้ว';
+
+        return redirect()->back()->with('success', $msg);
     }
 
     /**
@@ -203,7 +218,6 @@ class InternalMemoController extends Controller
 
         if ($memo->approver_1_id == $user->id && $memo->approver_1_status == 'pending') {
             $memo->approver_1_status = 'approved';
-            // ปรับตรรกะ: หากเป็นประเภทอนุมัติ 1 ขั้นตอน หรือไม่ได้เลือกผู้อนุมัติคนที่สองไว้ ให้เปลี่ยนสถานะเอกสารเป็นอนุมัติสมบูรณ์ (approved) ทันที
             if ($memo->approval_type == 1 || !$memo->approver_2_id) {
                 $memo->status = 'approved';
             }
@@ -231,18 +245,34 @@ class InternalMemoController extends Controller
         $user = Auth::user();
         $memo = InternalMemo::findOrFail($id);
 
+        $reasonField = $request->has('reject_reason') ? 'reject_reason' : 'reject_comment';
+
         $request->validate([
-            'reject_comment' => 'required|string|max:500'
+            $reasonField => 'required|string|max:1000'
         ]);
+
+        $reasonText = $request->input($reasonField);
 
         if ($memo->approver_1_id == $user->id && $memo->approver_1_status == 'pending') {
             $memo->approver_1_status = 'rejected';
             $memo->status = 'rejected';
-            $memo->reject_comment = $request->reject_comment;
+            
+            if (\Schema::hasColumn('internal_memos', 'reject_comment')) {
+                $memo->reject_comment = $reasonText;
+            }
+            if (\Schema::hasColumn('internal_memos', 'reject_reason')) {
+                $memo->reject_reason = $reasonText;
+            }
         } elseif ($memo->approver_2_id == $user->id && $memo->approver_2_status == 'pending') {
             $memo->approver_2_status = 'rejected';
             $memo->status = 'rejected';
-            $memo->reject_comment = $request->reject_comment;
+            
+            if (\Schema::hasColumn('internal_memos', 'reject_comment')) {
+                $memo->reject_comment = $reasonText;
+            }
+            if (\Schema::hasColumn('internal_memos', 'reject_reason')) {
+                $memo->reject_reason = $reasonText;
+            }
         } else {
             return back()->with('error', 'คุณไม่มีสิทธิ์ปฏิเสธเอกสารฉบับนี้ หรือสถานะไม่ถูกต้อง');
         }
@@ -252,7 +282,7 @@ class InternalMemoController extends Controller
     }
 
     /**
-     * แสดงหน้าศูนย์รวมรายการคำขออนุมัติใบบันทึกภายในสำหรับ หัวหน้าแผนก และ CEO
+     * หน้าศูนย์รวมรายการคำขออนุมัติ
      */
     public function approvals()
     {
@@ -274,17 +304,19 @@ class InternalMemoController extends Controller
             ->orderBy('created_at', 'desc')
             ->get();
 
-        return view('internal_memo.approvals', compact('pendingApprovals'));
+        $pendingMemos = $pendingApprovals;
+
+        return view('internal_memo.approvals', compact('pendingApprovals', 'pendingMemos'));
     }
 
     /**
-     * รองรับการส่ง Action อนุมัติ/ปฏิเสธผ่านแบบฟอร์มในหน้าศูนย์อนุมัติรวม
+     * ดำเนินการ อนุมัติ/ปฏิเสธ จากหน้าศูนย์รวม
      */
     public function approveAction(Request $request, $id)
     {
         $request->validate([
             'status' => 'required|in:approved,rejected',
-            'reject_comment' => 'nullable|string|max:500'
+            'reject_comment' => $request->status === 'rejected' ? 'required|string|max:500' : 'nullable|string|max:500'
         ]);
 
         if ($request->status === 'approved') {
@@ -292,5 +324,61 @@ class InternalMemoController extends Controller
         }
 
         return $this->reject($request, $id);
+    }
+
+    /**
+     * แสดงหน้าจอรายละเอียดเอกสารเดี่ยว
+     */
+    public function show($id)
+    {
+        $user = Auth::user();
+        
+        $relations = ['user', 'approver1', 'approver2'];
+        if (method_exists(InternalMemo::class, 'attachments')) {
+            $relations[] = 'attachments';
+        } elseif (method_exists(InternalMemo::class, 'files')) {
+            $relations[] = 'files';
+        }
+
+        if ($user->role === 'admin') {
+            $memo = InternalMemo::with($relations)->findOrFail($id);
+        } else {
+            $memo = InternalMemo::with($relations)
+                ->where(function($q) use ($user) {
+                    $q->where('user_id', $user->id)
+                      ->orWhere('approver_1_id', $user->id)
+                      ->orWhere('approver_2_id', $user->id);
+                })
+                ->findOrFail($id);
+        }
+
+        if (!$memo->user) {
+            $memo->setRelation('user', new class { public $name = 'ไม่พบข้อมูลพนักงาน (หรือบัญชีถูกลบ)'; });
+        }
+
+        $memo->attachments = method_exists(InternalMemo::class, 'attachments') ? $memo->attachments : ($memo->files ?? collect());
+
+        return view('internal_memo.show', compact('memo'));
+    }
+
+    /**
+     * ส่งข้อมูล JSON สำหรับป๊อปอัปหน้าบ้าน
+     */
+    public function showJson($id)
+    {
+        try {
+            $memo = InternalMemo::with(['user', 'approver1', 'approver2', 'attachments'])->findOrFail($id);
+            $memo->files = $memo->attachments;
+
+            return response()->json([
+                'success' => true,
+                'data' => $memo
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 404);
+        }
     }
 }

@@ -174,7 +174,16 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/{id}/approve', [InternalMemoController::class, 'approve'])->name('approve');
         Route::post('/{id}/reject', [InternalMemoController::class, 'reject'])->name('reject');
+        
+        // ➕ เพิ่มใหม่: Route สำหรับหน้าแสดงรายละเอียดและการพิมพ์เอกสารบันทึกภายใน
+        Route::get('/{id}', [InternalMemoController::class, 'show'])->name('show');
+
+        // 🛠️ ➕ เพิ่มใหม่แก้วิกฤต Popup: เปิดท่อรับส่งข้อมูลรูปแบบ JSON สำหรับใช้ดึงข้อมูลมาแสดงบน Modal
+        Route::get('/{id}/json', [InternalMemoController::class, 'showJson'])->name('show.json');
     });
+
+    // 🚀 🔥 เพิ่มนามแฝง (Alias Route) เพื่อผูกข้ามระบบ ให้หน้า View อนุมัติสามารถใช้ชื่อเรียกตามสถาปัตยกรรมแบบดั้งเดิม 'memo.approve.action' ได้โดยไม่พัง
+    Route::post('internal-memo/approvals/{id}/action', [InternalMemoController::class, 'approveAction'])->name('memo.approve.action');
 
     // --- ส่วนของ Admin (การจัดการสมาชิก) ---
     Route::get('/admin/add-user', [UserController::class, 'create'])->name('admin.users.create');

@@ -48,6 +48,37 @@
             font-size: 1.1rem;
         }
         [x-cloak] { display: none !important; }
+
+        /* 🖨️ เพิ่มเติม: จัดการรูปแบบการพิมพ์เอกสารทางเครื่องพิมพ์ (Print Media) ให้รองรับหน้า Internal Memo */
+        @media print {
+            .bg-slate-900, 
+            aside, 
+            nav, 
+            form, 
+            button, 
+            .w-72,
+            .no-print { 
+                display: none !important; 
+            }
+            body { 
+                background-color: #ffffff !important; 
+                color: #000000 !important;
+                display: block !important;
+                min-h-screen: 0 !important;
+            }
+            .flex-1 { 
+                padding: 0 !important; 
+                margin: 0 !important; 
+                overflow: visible !important;
+                display: block !important;
+            }
+            .max-w-7xl {
+                max-w: 100% !important;
+                width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+        }
     </style>
 </head>
 <body class="flex min-h-screen">

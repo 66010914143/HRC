@@ -3,6 +3,9 @@
 @section('title', 'สร้างบันทึกภายใน (Internal Memo) - HRC SYSTEM')
 
 @section('content')
+@php
+    $isCeo = (auth()->user() && (auth()->user()->position === 'CEO' || auth()->user()->role === 'ceo')) || (isset($user) && ($user->position === 'CEO' || $user->role === 'ceo'));
+@endphp
 <div class="container-fluid" x-data="{ approvalType: '{{ old('approval_type', $isStaff ? '2' : '1') }}' }">
     <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
         <div>
@@ -56,7 +59,11 @@
             </div>
             @if(!$isStaff)
                 <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <i class="fas fa-user-shield"></i> ระดับหัวหน้างาน (ส่งตรงหา CEO อัตโนมัติ)
+                    @if($isCeo)
+                        <i class="fas fa-user-shield"></i> ระดับผู้บริหารสูงสุด (อนุมัติอัตโนมัติ)
+                    @else
+                        <i class="fas fa-user-shield"></i> ระดับหัวหน้างาน (ส่งตรงหา CEO อัตโนมัติ)
+                    @endif
                 </span>
             @endif
         </div>
@@ -149,7 +156,7 @@
                     </div>
 
                     <div>
-                        <label for="amount" class="block text-sm font-semibold text-slate-700 mb-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
                             จำนวนเงินงบประมาณ (บาท) <span class="text-slate-400 font-normal">(ถ้ามี)</span>
                         </label>
                         <div class="relative">
@@ -175,75 +182,111 @@
                         <label class="block text-sm font-semibold text-slate-700 mb-2">
                             รูปแบบการอนุมัติ <span class="text-rose-500">*</span>
                         </label>
-                        <div class="grid grid-cols-2 gap-3">
-                            <label class="border rounded-xl p-3 flex items-center gap-2 cursor-pointer transition-all hover:bg-slate-50"
-                                :class="approvalType === '1' ? 'border-blue-500 bg-blue-50/40 text-blue-700 font-bold' : 'border-slate-200'">
-                                <input type="radio" name="approval_type" value="1" x-model="approvalType" class="text-blue-600 focus:ring-blue-500">
-                                <span class="text-xs">อนุมัติ 1 ขั้นตอน</span>
-                            </label>
-                            <label class="border rounded-xl p-3 flex items-center gap-2 cursor-pointer transition-all hover:bg-slate-50"
-                                :class="approvalType === '2' ? 'border-blue-500 bg-blue-50/40 text-blue-700 font-bold' : 'border-slate-200'">
-                                <input type="radio" name="approval_type" value="2" x-model="approvalType" class="text-blue-600 focus:ring-blue-500">
-                                <span class="text-xs">อนุมัติ 2 ขั้นตอน</span>
-                            </label>
-                        </div>
+                        @if($isStaff)
+                            <div class="grid grid-cols-2 gap-3">
+                                <label class="border rounded-xl p-3 flex items-center gap-2 cursor-pointer transition-all hover:bg-slate-50"
+                                    :class="approvalType === '1' ? 'border-blue-500 bg-blue-50/40 text-blue-700 font-bold' : 'border-slate-200'">
+                                    <input type="radio" name="approval_type" value="1" x-model="approvalType" class="text-blue-600 focus:ring-blue-500">
+                                    <span class="text-xs">อนุมัติ 1 ขั้นตอน</span>
+                                </label>
+                                <label class="border rounded-xl p-3 flex items-center gap-2 cursor-pointer transition-all hover:bg-slate-50"
+                                    :class="approvalType === '2' ? 'border-blue-500 bg-blue-50/40 text-blue-700 font-bold' : 'border-slate-200'">
+                                    <input type="radio" name="approval_type" value="2" x-model="approvalType" class="text-blue-600 focus:ring-blue-500">
+                                    <span class="text-xs">อนุมัติ 2 ขั้นตอน</span>
+                                </label>
+                            </div>
+                        @else
+                            <input type="hidden" name="approval_type" value="1">
+                            <div class="px-4 bg-blue-50 text-blue-700 text-sm rounded-xl border border-blue-200 h-[46px] flex items-center font-semibold w-full">
+                                @if($isCeo)
+                                    <i class="fas fa-info-circle mr-2 text-sm"></i> อนุมัติอัตโนมัติโดยผู้บริหารสูงสุด
+                                @else
+                                    <i class="fas fa-info-circle mr-2 text-sm"></i> วิ่งขั้นตอนเดียวส่งตรงหา CEO
+                                @endif
+                            </div>
+                        @endif
                     </div>
 
-                    <div>
-                        <div x-show="approvalType === '2'" x-transition>
-                            <label for="approver_1_id" class="block text-sm font-semibold text-slate-700 mb-2">
-                                ผู้อนุมัติขั้นที่ 1 (หัวหน้าแผนก/ฝ่าย) <span class="text-rose-500">*</span>
-                            </label>
-                            <select name="approver_1_id" id="approver_1_id" :required="approvalType === '2'"
-                                class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
-                                <option value="">-- เลือกหัวหน้าแผนก --</option>
-                                @foreach($departmentHeads as $head)
-                                    <option value="{{ $head->id }}" {{ old('approver_1_id') == $head->id ? 'selected' : '' }}>
-                                        {{ $head->name }} ({{ $head->position }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div x-show="approvalType === '1'" x-transition>
-                            <label class="block text-sm font-semibold text-slate-400 mb-2">ผู้อนุมัติขั้นที่ 1</label>
-                            <div class="px-4 bg-slate-100 text-slate-400 text-sm rounded-xl border border-slate-200 h-[46px] flex items-center justify-center font-medium select-none w-full">
-                                <i class="fas fa-forward mr-2 text-xs"></i> ข้ามขั้นตอน (ระบบจะส่งตรงหา CEO)
+                    @if($isStaff)
+                        {{-- ช่องสำหรับ ผู้อนุมัติขั้นที่ 1 --}}
+                        <div>
+                            <div>
+                                <label for="approver_1_id_fixed" class="block text-sm font-semibold text-slate-700 mb-2">
+                                    ผู้อนุมัติขั้นที่ 1 (หัวหน้าแผนก/ฝ่าย) <span class="text-rose-500">*</span>
+                                </label>
+                                <select name="approver_1_id" id="approver_1_id_fixed" required
+                                    class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
+                                    <option value="">-- เลือกหัวหน้าแผนก --</option>
+                                    @foreach($departmentHeads as $head)
+                                        <option value="{{ $head->id }}" {{ old('approver_1_id') == $head->id ? 'selected' : '' }}>
+                                            {{ $head->name }} ({{ $head->position }})
+                                        </option>
+                                    @endforeach
+                                </select>
                             </div>
                         </div>
-                    </div>
 
-                    <div>
-                        <div x-show="approvalType === '2'" x-transition>
-                            <label for="approver_2_id" class="block text-sm font-semibold text-slate-700 mb-2">
-                                ผู้อนุมัติขั้นสุดท้าย (CEO / ผู้บริหารสูงสุด) <span class="text-rose-500">*</span>
-                            </label>
-                            <select name="approver_2_id" id="approver_2_id" :required="approvalType === '2'"
-                                class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
-                                <option value="">-- เลือกประธานเจ้าหน้าที่บริหาร --</option>
-                                @foreach($ceos as $ceo)
-                                    <option value="{{ $ceo->id }}" {{ old('approver_2_id') == $ceo->id ? 'selected' : '' }}>
-                                        {{ $ceo->name }} ({{ $ceo->position }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
+                        {{-- ช่องสำหรับ ผู้อนุมัติขั้นสุดท้าย --}}
+                        <div>
+                            {{-- กรณี อนุมัติ 2 ขั้นตอน --}}
+                            <div x-show="approvalType === '2'" x-transition>
+                                <label for="approver_2_id" class="block text-sm font-semibold text-slate-700 mb-2">
+                                    ผู้อนุมัติขั้นสุดท้าย (CEO / ผู้บริหารสูงสุด) <span class="text-rose-500">*</span>
+                                </label>
+                                <select name="approver_2_id" id="approver_2_id" :required="approvalType === '2'" :disabled="approvalType !== '2'"
+                                    class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
+                                    <option value="">-- เลือกประธานเจ้าหน้าที่บริหาร --</option>
+                                    @foreach($ceos as $ceo)
+                                        <option value="{{ $ceo->id }}" {{ old('approver_2_id') == $ceo->id ? 'selected' : '' }}>
+                                            {{ $ceo->name }} ({{ $ceo->position }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
 
-                        <div x-show="approvalType === '1'" x-transition>
-                            <label for="approver_2_id_direct" class="block text-sm font-semibold text-slate-700 mb-2">
-                                ผู้อนุมัติส่งตรง (CEO / ผู้บริหารสูงสุด) <span class="text-rose-500">*</span>
-                            </label>
-                            <select name="approver_2_id" id="approver_2_id_direct" :required="approvalType === '1'"
-                                class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
-                                <option value="">-- เลือกประธานเจ้าหน้าที่บริหาร --</option>
-                                @foreach($ceos as $ceo)
-                                    <option value="{{ $ceo->id }}" {{ old('approver_2_id') == $ceo->id ? 'selected' : '' }}>
-                                        {{ $ceo->name }} ({{ $ceo->position }})
-                                    </option>
-                                @endforeach
-                            </select>
+                            {{-- กรณี อนุมัติ 1 ขั้นตอน --}}
+                            <div x-show="approvalType === '1'" x-transition>
+                                <label class="block text-sm font-semibold text-slate-400 mb-2">ผู้อนุมัติขั้นสุดท้าย</label>
+                                <div class="px-4 bg-slate-100 text-slate-400 text-sm rounded-xl border border-slate-200 h-[46px] flex items-center justify-center font-medium select-none w-full">
+                                    <i class="fas fa-forward mr-2 text-xs"></i> สิ้นสุดที่หัวหน้างาน (ไม่ต้องส่งต่อหา CEO)
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                    @else
+                        <div class="hidden">
+                            <input type="hidden" name="approver_1_id" value="">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-400 mb-2">ผู้อนุมัติขั้นที่ 1</label>
+                            <div class="px-4 bg-slate-100 text-slate-400 text-sm rounded-xl border border-slate-200 h-[46px] flex items-center justify-center font-medium select-none w-full">
+                                <i class="fas fa-ban mr-2 text-xs"></i> ไม่สามารถเลือกได้ (ถูกบล็อกสำหรับสิทธิ์หัวหน้า)
+                            </div>
+                        </div>
+                        <div>
+                            @if($isCeo)
+                                <label class="block text-sm font-semibold text-slate-700 mb-2">
+                                    ผู้อนุมัติขั้นสุดท้าย (CEO / ผู้บริหารสูงสุด)
+                                </label>
+                                <div class="px-4 bg-emerald-50 text-emerald-700 text-sm rounded-xl border border-emerald-200 h-[46px] flex items-center font-semibold w-full">
+                                    <i class="fas fa-check-circle mr-2 text-emerald-500"></i> อนุมัติทันทีโดยสิทธิ์ CEO
+                                </div>
+                                <input type="hidden" name="approver_2_id" value="">
+                            @else
+                                <label for="approver_2_id_boss" class="block text-sm font-semibold text-slate-700 mb-2">
+                                    ผู้อนุมัติขั้นสุดท้าย (CEO / ผู้บริหารสูงสุด) <span class="text-rose-500">*</span>
+                                </label>
+                                <select name="approver_2_id" id="approver_2_id_boss" required
+                                    class="block w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm text-slate-900">
+                                    <option value="">-- เลือกประธานเจ้าหน้าที่บริหาร --</option>
+                                    @foreach($ceos as $ceo)
+                                        <option value="{{ $ceo->id }}" {{ old('approver_2_id') == $ceo->id ? 'selected' : '' }}>
+                                            {{ $ceo->name }} ({{ $ceo->position }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            @endif
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -287,6 +330,21 @@
 
 @push('scripts')
 <script>
+    // สคริปต์ช่วยเลือกรายชื่อ CEO คนแรกให้อัตโนมัติในฝั่งหน้าบ้าน เพื่อไม่ให้เกิด Validation Error ว่ายังไม่ได้เลือก
+    document.addEventListener("DOMContentLoaded", function () {
+        const ceoSelectBoss = document.getElementById('approver_2_id_boss');
+        if (ceoSelectBoss) {
+            // ดึง option ตัวแรกที่มีค่า ID (ไม่ใช่ค่าว่างที่เป็นหัวข้อเริ่มต้น)
+            const options = ceoSelectBoss.querySelectorAll('option');
+            for (let i = 0; i < options.length; i++) {
+                if (options[i].value !== "") {
+                    options[i].selected = true; // เลือก CEO คนแรกให้อัตโนมัติทันที
+                    break;
+                }
+            }
+        }
+    });
+
     // สคริปต์ตรวจจับและแสดงชื่อไฟล์แนบที่เลือกแบบเรียลไทม์
     document.getElementById('files').addEventListener('change', function(e) {
         const fileList = document.getElementById('file-list');
